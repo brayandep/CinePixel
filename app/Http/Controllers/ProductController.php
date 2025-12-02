@@ -1,0 +1,105 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Product;
+use Illuminate\Http\Request;
+
+class ProductController extends Controller
+{
+    public function index(Request $request)
+    {
+        $query = Product::query();
+
+        // Filtro por tipo de producto (regalo / snack)
+        if ($request->filled('product_type')) {
+            $query->where('product_type', $request->product_type);
+        }
+
+        // Filtro por nombre (coincidencias)
+        if ($request->filled('q')) {
+            $search = $request->q;
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        // Ordenar por nombre y paginar de 6 en 6
+        $products = $query->orderBy('name')
+                        ->paginate(6)
+                        ->withQueryString(); // mantiene filtros en la paginación
+
+        return view('productos.index', [
+            'products'     => $products,
+            'product_type' => $request->product_type,
+            'search'       => $request->q,
+        ]);
+    }
+    public function create()
+    {
+        return view('productos.create');
+    }
+
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'name'        => ['required', 'string', 'max:255'],
+            'price'       => ['required', 'numeric', 'min:0'],
+            'stock'       => ['required', 'integer', 'min:0'],
+            'status'      => ['required', 'in:disponible,no_disponible'],
+            'product_type'=> ['required', 'in:regalo,snack'],   // 👈 nuevo
+            'description' => ['nullable', 'string'],
+            'image'       => ['nullable', 'image', 'max:2048'], // 2MB
+        ], [
+            'name.required'  => 'El nombre del producto es obligatorio.',
+            'price.required' => 'El costo del producto es obligatorio.',
+            'stock.required' => 'La cantidad del producto es obligatoria.',
+        ]);
+
+        $imagePath = null;
+
+        if ($request->hasFile('image')) {
+            // guarda en storage/app/public/products
+            $imagePath = $request->file('image')->store('products', 'public');
+        }
+
+        Product::create([
+            'name'        => $data['name'],
+            'price'       => $data['price'],
+            'stock'       => $data['stock'],
+            'status'      => $data['status'],
+            'product_type' => $data['product_type'],   // 👈 nuevo
+            'description' => $data['description'] ?? null,
+            'image_path'  => $imagePath,
+        ]);
+
+        return redirect()
+            ->route('products.create')
+            ->with('success', 'Producto registrado correctamente.');
+    }
+    public function addProduct(Request $request, Product $product)
+    {
+        // Validamos la cantidad a agregar
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+        ]);
+
+        // Agregamos la cantidad al stock
+        $product->stock += $request->quantity;
+        $product->save();
+
+        return redirect()->route('products.index')->with('success', 'Producto agregado correctamente.');
+}
+
+    public function sellProduct(Request $request, Product $product)
+    {
+        // Validamos la cantidad a vender
+        $request->validate([
+            'quantity' => 'required|integer|min:1|max:' . $product->stock,
+        ]);
+
+        // Reducimos la cantidad del stock
+        $product->stock -= $request->quantity;
+        $product->save();
+
+        return redirect()->route('products.index')->with('success', 'Producto vendido correctamente.');
+    }
+}
