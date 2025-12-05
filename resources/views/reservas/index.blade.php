@@ -33,7 +33,8 @@
                 {{-- Salas disponibles --}}
                 <div class="mb-3">
                     <label class="reservas-label">Salas disponibles</label>
-                    <select name="room_id" class="form-select">
+                    <select name="room_id" class="form-select" id="room_id">
+                       
                         @forelse ($availableRooms as $room)
                             <option value="{{ $room->id }}" {{ old('room_id') == $room->id ? 'selected' : '' }}>
                                 {{ $room->name }}
@@ -48,19 +49,17 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label class="reservas-label">Hora de inicio</label>
-                        <input type="time" name="start_time" class="form-control"
-                               value="{{ old('start_time') }}">
+                        <input type="time" name="start_time" class="form-control" value="{{ old('start_time') }}" id="start_time">
                     </div>
                     <div class="col-md-6">
                         <label class="reservas-label">Hora de salida</label>
-                        <input type="time" name="end_time" class="form-control"
-                               value="{{ old('end_time') }}">
+                        <input type="time" name="end_time" class="form-control" value="{{ old('end_time') }}" id="end_time">
                     </div>
                 </div>
 
-                {{-- Entrada para dos personas --}}
+                {{-- Entrada para tres opciones --}}
                 <div class="mb-3">
-                    <label class="reservas-label">Entrada para dos personas</label>
+                    <label class="reservas-label">Entrada para tres opciones</label>
                     <div class="form-check">
                         <input class="form-check-input" type="radio" name="two_people" id="two_yes" value="1"
                                {{ old('two_people', '1') == '1' ? 'checked' : '' }}>
@@ -73,6 +72,13 @@
                                {{ old('two_people') == '0' ? 'checked' : '' }}>
                         <label class="form-check-label" for="two_no">
                             No (10 Bs la hora)
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="two_people" id="solo_tienda" value="3"
+                               {{ old('two_people') == '3' ? 'checked' : '' }}>
+                        <label class="form-check-label" for="solo_tienda">
+                            Solo tienda (0 Bs)
                         </label>
                     </div>
                 </div>
@@ -152,17 +158,42 @@
 
 </div>
 <script>
-    const productsInput   = document.getElementById('products_amount');
+    // Hacer que los campos de hora sean opcionales cuando se seleccione "Solo tienda"
+    function toggleSalaFields() {
+        const roomSelect = document.querySelector('select[name="room_id"]');
+        const startInput = document.querySelector('[name="start_time"]');
+        const endInput = document.querySelector('[name="end_time"]');
+        
+        // Si se selecciona "Solo tienda", deshabilitar los campos de hora
+        if (roomSelect.value === 'no_sala') {
+            startInput.disabled = true;
+            endInput.disabled = true;
+        } else {
+            startInput.disabled = false;
+            endInput.disabled = false;
+        }
+    }
+
+    // Ejecutar la función al cargar la página
+    window.onload = toggleSalaFields;
+
+    // Asignar evento onchange al select para que se ejecute cuando se cambie de sala
+    document.querySelector('select[name="room_id"]').addEventListener('change', toggleSalaFields);
+</script>
+
+<script>
+    const productsInput = document.getElementById('products_amount');
     const hourCostDisplay = document.getElementById('hour_cost_display');
-    const totalDisplay    = document.getElementById('total_display');
-    const radioYes        = document.getElementById('two_yes');
-    const radioNo         = document.getElementById('two_no');
-    const startInput      = document.querySelector('[name="start_time"]');
-    const endInput        = document.querySelector('[name="end_time"]');
+    const totalDisplay = document.getElementById('total_display');
+    const radioYes = document.getElementById('two_yes');
+    const radioNo = document.getElementById('two_no');
+    const radioTienda = document.getElementById('solo_tienda');
+    const startInput = document.querySelector('[name="start_time"]');
+    const endInput = document.querySelector('[name="end_time"]');
 
     function calcHours() {
         const startVal = startInput.value;
-        const endVal   = endInput.value;
+        const endVal = endInput.value;
 
         if (!startVal || !endVal) return 1;
 
@@ -170,13 +201,12 @@
         const [eh, em] = endVal.split(':').map(Number);
 
         const startMinutes = sh * 60 + sm;
-        const endMinutes   = eh * 60 + em;
+        const endMinutes = eh * 60 + em;
 
         if (endMinutes <= startMinutes) return 1;
 
         const diffMinutes = endMinutes - startMinutes;
 
-        // Redondear hacia arriba a la hora completa
         let hours = Math.ceil(diffMinutes / 60);
 
         if (hours < 1) hours = 1;
@@ -186,23 +216,36 @@
 
     function updateTotals() {
         const basePerPerson = 10;
-        const twoPeople = radioYes.checked;
-        const numPeople = twoPeople ? 2 : 1;
+        let numPeople = 1;
+        let entryAmount = 0;
+
+        if (radioYes.checked) {
+            numPeople = 2;
+        } else if (radioNo.checked) {
+            numPeople = 1;
+        } else if (radioTienda.checked) {
+            entryAmount = 0;
+        }
 
         const hours = calcHours();
 
         let products = parseFloat(productsInput.value);
         if (isNaN(products) || products < 0) products = 0;
 
-        const hourCost = basePerPerson * numPeople * hours;
-        const total    = hourCost + products;
+        // Si "Solo tienda" se selecciona, el costo por hora es 0
+        if (!radioTienda.checked) {
+            entryAmount = basePerPerson * numPeople * hours;
+        }
 
-        hourCostDisplay.textContent = hourCost.toFixed(2) + ' Bs';
-        totalDisplay.textContent    = total.toFixed(2) + ' Bs';
+        const total = entryAmount + products;
+
+        hourCostDisplay.textContent = entryAmount.toFixed(2) + ' Bs';
+        totalDisplay.textContent = total.toFixed(2) + ' Bs';
     }
 
     radioYes.addEventListener('change', updateTotals);
     radioNo.addEventListener('change', updateTotals);
+    radioTienda.addEventListener('change', updateTotals);
     productsInput.addEventListener('input', updateTotals);
     startInput.addEventListener('change', updateTotals);
     endInput.addEventListener('change', updateTotals);
@@ -210,10 +253,5 @@
     // cálculo inicial
     updateTotals();
 </script>
-<script>
-    // Recargar la página cada 60 segundos para actualizar el estado de las salas
-    setInterval(function () {
-        window.location.reload();
-    }, 60000);
-</script>
+
 @endsection

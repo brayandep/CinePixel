@@ -42,55 +42,60 @@ class ReservationController extends Controller
             'availableRooms' => $availableRooms,
         ]);
     }
-
     public function store(Request $request)
-    {
-        // Validación básica
-        $data = $request->validate([
-            'room_id'         => ['required', 'exists:rooms,id'],
-            'start_time'      => ['required', 'date_format:H:i'],
-            'end_time'        => ['required', 'date_format:H:i', 'after:start_time'],
-            'two_people'      => ['required', 'in:0,1'],
-            'products_amount' => ['nullable', 'numeric', 'min:0'],
-            'payment_method'  => ['required', 'in:efectivo,qr'],
-        ]);
+{
+    // Validación básica
+    $data = $request->validate([
+        'room_id'         => ['required_if:two_people,!=,3', 'exists:rooms,id'], // Solo obligatorio si no es "Solo tienda"
+        'start_time'      => ['required', 'date_format:H:i'],
+        'end_time'        => ['required', 'date_format:H:i', 'after:start_time'],
+        'two_people'      => ['required', 'in:0,1,2,3'], // Incluimos la opción "Solo tienda"
+        'products_amount' => ['nullable', 'numeric', 'min:0'],
+        'payment_method'  => ['required', 'in:efectivo,qr'],
+    ]);
 
-        $today = now()->format('Y-m-d');
+    $today = now()->format('Y-m-d');
+    $start = Carbon::createFromFormat('Y-m-d H:i', $today.' '.$data['start_time'], 'America/La_Paz');
+    $end   = Carbon::createFromFormat('Y-m-d H:i', $today.' '.$data['end_time'], 'America/La_Paz');
 
-        $start = Carbon::createFromFormat('Y-m-d H:i', $today.' '.$data['start_time']);
-        $end   = Carbon::createFromFormat('Y-m-d H:i', $today.' '.$data['end_time']);
-    
-       $numPeople = $data['two_people'] ? 2 : 1;
-        $products  = $data['products_amount'] ?? 0;
+    // Si selecciona "Solo tienda", no cobramos por la sala
+    $numPeople = $data['two_people'] == 3 ? 0 : ($data['two_people'] == 1 ? 1 : 2);  // Cambiamos a 0 si es solo tienda
+    $products  = $data['products_amount'] ?? 0;
 
-        // Cálculo de horas redondeado hacia arriba
-        $minutes = $start->diffInMinutes($end);
-        $hours   = (int) ceil($minutes / 60);
-        if ($hours < 1) $hours = 1;
-
-        // 10 Bs POR PERSONA POR HORA → esto es SOLO la sala
-        $entryAmount = 10 * $numPeople * $hours;
-
-        // TOTAL que paga el cliente (sala + productos)
-        $total = $entryAmount + $products;
-
-        Reservation::create([
-            'room_id'         => $data['room_id'],
-            'user_id'         => auth()->id(),
-            'start_time'      => $start,
-            'end_time'        => $end,
-            'num_people'      => $numPeople,
-            'products_amount' => $products,
-            'entry_amount'    => $entryAmount,   // 👈 solo entradas
-            'payment_method'  => $data['payment_method'],
-            'total'           => $total,         // 👈 entradas + productos
-            'status'          => 'activa',
-        ]);
-
-        return redirect()
-            ->route('reservas.index')
-            ->with('success', 'Reserva registrada correctamente.');
+    // Calculamos el costo por hora
+    $entryAmount = 0; // Inicializamos en 0 para el caso "Solo tienda"
+    if ($data['two_people'] != 3) {
+        // Calculamos solo si no es "Solo tienda"
+        $hours = $start->diffInHours($end);
+        $hours = $hours < 1 ? 1 : $hours; // Aseguramos que no sea menos de 1 hora
+        $entryAmount = 10 * $numPeople * $hours; // Costo por hora
     }
+
+    // Total a pagar (entrada + productos)
+    $total = $entryAmount + $products;
+
+    // Si es "Solo tienda", asignamos el room_id de la sala "Tienda"
+    $roomId = $data['two_people'] == 3 ? Room::where('name', 'Tienda')->first()->id : $data['room_id'];
+
+    Reservation::create([
+        'room_id'         => $roomId,  // Usamos el room_id de "Tienda" cuando es "Solo tienda"
+        'user_id'         => auth()->id(),
+        'start_time'      => $start,
+        'end_time'        => $end,
+        'num_people'      => $numPeople,
+        'products_amount' => $products,
+        'entry_amount'    => $entryAmount,
+        'payment_method'  => $data['payment_method'],
+        'total'           => $total,
+        'status'          => 'activa',
+    ]);
+
+    return redirect()
+        ->route('reservas.index')
+        ->with('success', 'Reserva registrada correctamente.');
+}
+
+
     public function finish(Reservation $reservation)
     {
         // Marcamos la reserva como finalizada
