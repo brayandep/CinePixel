@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use Illuminate\Http\Request;
+use App\Models\ProductMovement;
+use Barryvdh\DomPDF\Facade\Pdf;
+
 
 class ProductController extends Controller
 {
@@ -75,31 +78,99 @@ class ProductController extends Controller
             ->route('products.create')
             ->with('success', 'Producto registrado correctamente.');
     }
-    public function addProduct(Request $request, Product $product)
+   public function addProduct(Request $request, Product $product)
     {
-        // Validamos la cantidad a agregar
         $request->validate([
             'quantity' => 'required|integer|min:1',
         ]);
 
-        // Agregamos la cantidad al stock
+        // Aumentar stock
         $product->stock += $request->quantity;
         $product->save();
 
-        return redirect()->route('products.index')->with('success', 'Producto agregado correctamente.');
-}
+        // Registrar movimiento
+        ProductMovement::create([
+            'product_id'   => $product->id,
+            'movement_type'=> 'entrada',
+            'quantity'     => $request->quantity,
+            'unit_price'   => $product->price,
+            'total_price'  => $product->price * $request->quantity,
+        ]);
+
+        return redirect()->route('products.index')->with('success', 'Stock agregado correctamente.');
+    }
+
 
     public function sellProduct(Request $request, Product $product)
     {
-        // Validamos la cantidad a vender
         $request->validate([
             'quantity' => 'required|integer|min:1|max:' . $product->stock,
         ]);
 
-        // Reducimos la cantidad del stock
+        // Reducir stock
         $product->stock -= $request->quantity;
         $product->save();
 
+        // Registrar movimiento
+        ProductMovement::create([
+            'product_id'   => $product->id,
+            'movement_type'=> 'venta',
+            'quantity'     => $request->quantity,
+            'unit_price'   => $product->price,
+            'total_price'  => $product->price * $request->quantity,
+        ]);
+
         return redirect()->route('products.index')->with('success', 'Producto vendido correctamente.');
     }
+    public function history(Request $request)
+    {
+        $query = ProductMovement::with('product');
+
+        if ($request->filled('from')) {
+            $query->whereDate('created_at', '>=', $request->from);
+        }
+
+        if ($request->filled('to')) {
+            $query->whereDate('created_at', '<=', $request->to);
+        }
+
+        if ($request->filled('movement_type')) {
+            $query->where('movement_type', $request->movement_type);
+        }
+
+        $movements = $query->orderBy('created_at', 'desc')->paginate(20)->withQueryString();
+
+        return view('productos.historial', [
+            'movements' => $movements,
+            'from'      => $request->from,
+            'to'        => $request->to,
+            'movement_type' => $request->movement_type,
+        ]);
+    }
+    public function historyPdf(Request $request)
+{
+    $query = ProductMovement::with('product');
+
+    if ($request->filled('from')) {
+        $query->whereDate('created_at', '>=', $request->from);
+    }
+
+    if ($request->filled('to')) {
+        $query->whereDate('created_at', '<=', $request->to);
+    }
+
+    if ($request->filled('movement_type')) {
+        $query->where('movement_type', $request->movement_type);
+    }
+
+    $movements = $query->orderBy('created_at', 'desc')->get();
+
+    $pdf = Pdf::loadView('productos.historial_pdf', [
+        'movements' => $movements
+    ]);
+
+    return $pdf->download('historial_productos.pdf');
+}
+
+
 }

@@ -41,7 +41,7 @@
                 <a href="{{ route('reports.sales') }}">📊 Ver reportes de ventas</a>
                 <a href="{{ route('products.create') }}">➕ Registrar artículo de tienda de regalos</a>
                 <a href="{{ route('products.index') }}">🛒 Ver tienda</a>
-                <a href="#">📑 Ver registros de venta</a>
+                <a href="{{ route('products.history') }}">📑 Ver registros de venta</a>
             </nav>
         </aside>
 

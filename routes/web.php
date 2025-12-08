@@ -49,3 +49,6 @@ Route::post('/productos', [ProductController::class, 'store'])
 Route::get('/tienda', [ProductController::class, 'index'])->name('products.index');
 Route::post('/productos/agregar/{product}', [ProductController::class, 'addProduct'])->name('products.add');
 Route::post('/productos/vender/{product}', [ProductController::class, 'sellProduct'])->name('products.sell');
+
+Route::get('/productos/historial', [ProductController::class, 'history'])->name('products.history');
+Route::get('/productos/historial/pdf', [ProductController::class, 'historyPdf'])->name('products.history.pdf');
