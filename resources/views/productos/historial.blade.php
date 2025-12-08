@@ -44,6 +44,7 @@
             <th>Cantidad</th>
             <th>Precio Unit.</th>
             <th>Total</th>
+            <th>Stock actual</th>   {{-- NUEVA COLUMNA --}}
         </tr>
     </thead>
     <tbody>
@@ -55,10 +56,12 @@
                 <td>{{ $m->quantity }}</td>
                 <td>{{ number_format($m->unit_price, 2) }} Bs</td>
                 <td>{{ number_format($m->total_price, 2) }} Bs</td>
+                <td>{{ $m->stock_after }}</td>
             </tr>
         @endforeach
     </tbody>
 </table>
+
 
 {{ $movements->links() }}
 

@@ -12,7 +12,6 @@
 <body>
 
 <h2>Historial de Movimientos de Productos</h2>
-
 <table>
     <thead>
         <tr>
@@ -22,6 +21,7 @@
             <th>Cantidad</th>
             <th>Precio Unit.</th>
             <th>Total</th>
+            <th>Stock actual</th>
         </tr>
     </thead>
     <tbody>
@@ -33,10 +33,12 @@
                 <td>{{ $m->quantity }}</td>
                 <td>{{ number_format($m->unit_price, 2) }} Bs</td>
                 <td>{{ number_format($m->total_price, 2) }} Bs</td>
+                <td>{{ $m->stock_after }}</td>
             </tr>
         @endforeach
     </tbody>
 </table>
+
 
 </body>
 </html>

@@ -78,50 +78,53 @@ class ProductController extends Controller
             ->route('products.create')
             ->with('success', 'Producto registrado correctamente.');
     }
-   public function addProduct(Request $request, Product $product)
-    {
-        $request->validate([
-            'quantity' => 'required|integer|min:1',
-        ]);
+    public function addProduct(Request $request, Product $product)
+{
+    $request->validate([
+        'quantity' => 'required|integer|min:1',
+    ]);
 
-        // Aumentar stock
-        $product->stock += $request->quantity;
-        $product->save();
+    // AUMENTAR STOCK
+    $product->stock += $request->quantity;
+    $product->save();
 
-        // Registrar movimiento
-        ProductMovement::create([
-            'product_id'   => $product->id,
-            'movement_type'=> 'entrada',
-            'quantity'     => $request->quantity,
-            'unit_price'   => $product->price,
-            'total_price'  => $product->price * $request->quantity,
-        ]);
+    ProductMovement::create([
+        'product_id'   => $product->id,
+        'movement_type'=> 'entrada',
+        'quantity'     => $request->quantity,
+        'unit_price'   => $product->price,
+        'total_price'  => $product->price * $request->quantity,
+        'stock_after'  => $product->stock, // 🔥 IMPORTANTE
+    ]);
 
-        return redirect()->route('products.index')->with('success', 'Stock agregado correctamente.');
-    }
+    return redirect()->route('products.index')
+        ->with('success', 'Producto agregado correctamente.');
+}
 
 
-    public function sellProduct(Request $request, Product $product)
-    {
-        $request->validate([
-            'quantity' => 'required|integer|min:1|max:' . $product->stock,
-        ]);
+public function sellProduct(Request $request, Product $product)
+{
+    $request->validate([
+        'quantity' => 'required|integer|min:1|max:' . $product->stock,
+    ]);
 
-        // Reducir stock
-        $product->stock -= $request->quantity;
-        $product->save();
+    // REDUCIR EL STOCK
+    $product->stock -= $request->quantity;
+    $product->save();
 
-        // Registrar movimiento
-        ProductMovement::create([
-            'product_id'   => $product->id,
-            'movement_type'=> 'venta',
-            'quantity'     => $request->quantity,
-            'unit_price'   => $product->price,
-            'total_price'  => $product->price * $request->quantity,
-        ]);
+    ProductMovement::create([
+        'product_id'   => $product->id,
+        'movement_type'=> 'venta',
+        'quantity'     => $request->quantity,
+        'unit_price'   => $product->price,
+        'total_price'  => $product->price * $request->quantity,
+        'stock_after'  => $product->stock, // 🔥 IMPORTANTE
+    ]);
 
-        return redirect()->route('products.index')->with('success', 'Producto vendido correctamente.');
-    }
+    return redirect()->route('products.index')
+        ->with('success', 'Producto vendido correctamente.');
+}
+
     public function history(Request $request)
     {
         $query = ProductMovement::with('product');

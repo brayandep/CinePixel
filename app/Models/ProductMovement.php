@@ -14,7 +14,8 @@ class ProductMovement extends Model
         'movement_type',
         'quantity',
         'unit_price',
-        'total_price'
+        'total_price',
+        'stock_after',
     ];
 
     public function product()
